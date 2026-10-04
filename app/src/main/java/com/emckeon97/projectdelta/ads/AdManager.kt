@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * AdMob singleton for Project Delta.
+ * AdMob singleton for Pier Pressure.
  *
  * Ships with Google's TEST ad unit IDs ([useTestIDs] = true). When the real
  * AdMob units are provisioned, fill in the REAL_* constants and flip
