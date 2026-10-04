@@ -120,14 +120,15 @@ object AdManager {
     }
 
     /**
-     * Call on every game over. Shows an interstitial on every 3rd game over,
-     * at most once per 60 seconds.
+     * Call on every game over. Shows an interstitial on every 5th game over,
+     * at most once per 60 seconds — frequent enough to earn, rare enough
+     * to keep players.
      */
     fun gameOverOccurred(activity: Activity?) {
         gameOverCount++
         if (activity == null) return
         val now = System.currentTimeMillis()
-        if (gameOverCount % 3 == 0 && now - lastInterstitialShownAt > 60_000) {
+        if (gameOverCount % 5 == 0 && now - lastInterstitialShownAt > 60_000) {
             showInterstitial(activity)
         }
     }
