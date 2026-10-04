@@ -5,11 +5,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -39,8 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.emckeon97.projectdelta.characters.CharacterManager
-import com.emckeon97.projectdelta.game.GameEngine
-import com.emckeon97.projectdelta.game.GameRenderer
+import com.emckeon97.projectdelta.game.GameEngineimport com.emckeon97.projectdelta.game.GameRenderer
 import kotlin.math.abs
 
 /** Sepia HUD pill: cream serif text on dark translucent, gold hairline. */
@@ -65,6 +66,51 @@ private fun HudPill(text: String) {
 /** Minimum drag distance (px) before a swipe registers. */
 private const val SWIPE_THRESHOLD = 60f
 
+/** Silent-film title card shown when a new reel (level) begins. */
+@Composable
+private fun ReelTitleCard(reel: Int) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 40.dp)
+                .border(2.dp, DeltaTheme.gold, RoundedCornerShape(4.dp))
+                .padding(3.dp)
+                .border(1.dp, DeltaTheme.gold.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
+                .background(Color.Black.copy(alpha = 0.88f))
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "REEL $reel",
+                color = DeltaTheme.gold,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Serif,
+                letterSpacing = 4.sp
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = GameEngine.reelTitle(reel),
+                color = DeltaTheme.cream,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Serif
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = GameEngine.reelBlurb(reel),
+                color = DeltaTheme.cream.copy(alpha = 0.85f),
+                fontSize = 15.sp,
+                fontFamily = FontFamily.Serif,
+                lineHeight = 22.sp
+            )
+        }
+    }
+}
+
 @Composable
 fun GameScreen(
     navController: NavController,
@@ -81,6 +127,14 @@ fun GameScreen(
     // HUD mirrors of the engine's plain-Kotlin fields.
     var hudScore by remember { mutableIntStateOf(0) }
     var hudCoins by remember { mutableIntStateOf(0) }
+    // Silent-film reel title card.
+    var reelCard by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(reelCard) {
+        if (reelCard != null) {
+            kotlinx.coroutines.delay(2600)
+            reelCard = null
+        }
+    }
 
     LaunchedEffect(revive) {
         engine.paused = false
@@ -95,6 +149,10 @@ fun GameScreen(
             withFrameNanos {
                 hudScore = engine.score
                 hudCoins = engine.coinsCollected
+                if (engine.reelChanged) {
+                    engine.reelChanged = false
+                    reelCard = engine.reel
+                }
             }
         }
     }
@@ -171,9 +229,11 @@ fun GameScreen(
             }
         }
 
+        // Silent-film reel title card (auto-dismisses; doesn't block swipes)
+        reelCard?.let { ReelTitleCard(reel = it) }
+
         if (paused) {
-            AlertDialog(
-                onDismissRequest = { /* force an explicit choice */ },
+            AlertDialog(                onDismissRequest = { /* force an explicit choice */ },
                 title = { Text("Paused") },
                 text = { Text("Take a breather.") },
                 confirmButton = {
