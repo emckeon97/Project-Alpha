@@ -1,6 +1,7 @@
 package com.emckeon97.projectdelta.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -30,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +41,25 @@ import com.emckeon97.projectdelta.characters.CharacterManager
 import com.emckeon97.projectdelta.game.GameEngine
 import com.emckeon97.projectdelta.game.GameRenderer
 import kotlin.math.abs
+
+/** Sepia HUD pill: cream serif text on dark translucent, gold hairline. */
+@Composable
+private fun HudPill(text: String) {
+    Box(
+        modifier = Modifier
+            .border(1.dp, DeltaTheme.gold.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+            .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = text,
+            color = DeltaTheme.cream,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Serif
+        )
+    }
+}
 
 /** Minimum drag distance (px) before a swipe registers. */
 private const val SWIPE_THRESHOLD = 60f
@@ -123,7 +145,7 @@ fun GameScreen(
             )
         }
 
-        // HUD overlay
+        // HUD overlay — sepia pills (cream on dark, gold hairline)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -131,19 +153,9 @@ fun GameScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "$hudScore m",
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
+            HudPill(text = "$hudScore m")
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "\uD83E\uDE99 $hudCoins",
-                    color = Color(0xFFFFD54F),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                HudPill(text = "\uD83E\uDE99 $hudCoins")
                 Spacer(Modifier.width(12.dp))
                 Button(
                     onClick = {
