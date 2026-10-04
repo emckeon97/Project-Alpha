@@ -130,23 +130,66 @@ fun GameRenderer(
         }
         fun scaleAt(z: Float): Float = f / (z - camZ)
 
-        // ---- sky ----
+        // ---- sky: near-black navy, like an old cartoon reel at night ----
         drawRect(
             Brush.verticalGradient(
-                listOf(Color(0xFF04060E), Color(0xFF101542), Color(0xFF2E2154)),
+                listOf(Color(0xFF04060E), Color(0xFF0A0D1F)),
                 endY = horizonY
             ),
             size = Size(w, horizonY)
         )
-        // ---- ground ----
+        // ---- stars (fixed seed: no flicker) ----
+        val starRand = kotlin.random.Random(42)
+        repeat(44) {
+            val sx = starRand.nextFloat() * w
+            val sy = starRand.nextFloat() * horizonY * 0.92f
+            val sr = 1f + starRand.nextFloat() * 1.6f
+            val tw = 0.35f + 0.65f * abs(sin(tSec * (1f + starRand.nextFloat() * 2f) + it))
+            drawCircle(Color.White.copy(alpha = 0.75f * tw), sr, Offset(sx, sy))
+        }
+        // ---- moon + halo ----
+        val moonX = w * 0.22f
+        val moonY = h * 0.13f
+        val moonR = h * 0.045f
+        drawCircle(Color(0xFFF5EFE0).copy(alpha = 0.10f), moonR * 2.6f, Offset(moonX, moonY))
+        drawCircle(Color(0xFFF5EFE0).copy(alpha = 0.16f), moonR * 1.7f, Offset(moonX, moonY))
+        drawCircle(Color(0xFFF2EBD8), moonR, Offset(moonX, moonY))
+        // ---- water: one dark plane under everything ----
         drawRect(
             Brush.verticalGradient(
-                listOf(Color(0xFF0C0E1C), Color(0xFF05060C)),
+                listOf(Color(0xFF0A0F22), Color(0xFF04060D)),
                 startY = horizonY
             ),
             topLeft = Offset(0f, horizonY),
             size = Size(w, h - horizonY)
         )
+        // ---- moonlight path shimmering on the water ----
+        for (i in 0..7) {
+            val fy = i / 7f
+            val ry = horizonY + (h - horizonY) * (0.08f + 0.88f * fy * fy)
+            val rw = (10f + 46f * fy) * (0.75f + 0.25f * sin(tSec * 2.2f + i * 1.7f))
+            drawLine(
+                Color(0xFFF5EFE0).copy(alpha = 0.10f * (1f - fy * 0.6f)),
+                Offset(moonX - rw, ry), Offset(moonX + rw, ry),
+                strokeWidth = 3f + 5f * fy
+            )
+        }
+        // ---- scrolling moonlit wave dashes (2 rows per side, like iOS) ----
+        val waveMod = engine.distance % 4f
+        for (m in -1..17) {
+            val zLine = m * 4f - waveMod
+            if (zLine < -6f) continue
+            for (wx in floatArrayOf(-11f, -7f, 7f, 11f)) {
+                val wob = sin(wx * 12.9898f + m * 78.233f) * 0.7f
+                val a = proj(wx + wob - 0.85f, -0.5f, zLine) ?: continue
+                val b = proj(wx + wob + 0.85f, -0.5f, zLine) ?: continue
+                drawLine(
+                    Color.White.copy(alpha = 0.16f), a, b,
+                    strokeWidth = (scaleAt(zLine) * 0.10f).coerceIn(1f, 8f),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
         drawLine(
             Color(0xFF6A5ACD).copy(alpha = 0.25f),
             Offset(0f, horizonY), Offset(w, horizonY), strokeWidth = 2f
