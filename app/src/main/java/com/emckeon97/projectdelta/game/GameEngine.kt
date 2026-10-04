@@ -54,6 +54,14 @@ class GameEngine {
         private set
     var score: Int = 0
         private set
+    /** Silent-film reel (level): 1 per REEL_LENGTH meters, with a title card. */
+    var reel: Int = 1
+        private set
+    /**
+     * Set when the reel increments (or a run starts); the UI shows the
+     * title card, then resets this to false.
+     */
+    var reelChanged: Boolean = false
     var coinsCollected: Int = 0
         private set
     var gameOver: Boolean = false
@@ -122,6 +130,8 @@ class GameEngine {
         scrollSpeed = START_SPEED
         score = 0
         scoreAccum = 0f
+        reel = 1
+        reelChanged = true // show the REEL 1 title card as the run starts
         coinsCollected = 0
         gameOver = false
         paused = false
@@ -206,6 +216,13 @@ class GameEngine {
         scoreAccum += dz * if (doubleScore) 2f else 1f
         score = scoreAccum.toInt()
 
+        // silent-film reels: new title card every REEL_LENGTH meters
+        val newReel = (scoreAccum / REEL_LENGTH).toInt() + 1
+        if (newReel != reel) {
+            reel = newReel
+            reelChanged = true
+        }
+
         // spawning
         rowTimer -= dt
         if (rowTimer <= 0f) {
@@ -250,8 +267,9 @@ class GameEngine {
 
     // ---- spawning ----
     private fun spawnRow() {
-        // 1 or 2 lanes blocked; never all 3 (so never 3 trains in one row).
-        val blockedCount = if (random.nextFloat() < 0.45f) 2 else 1
+        // 1 or 2 lanes blocked; never all 3. Later reels crowd the pier a little more.
+        val twoChance = minOf(0.75f, 0.45f + 0.05f * (reel - 1))
+        val blockedCount = if (random.nextFloat() < twoChance) 2 else 1
         val lanes = listOf(0, 1, 2).shuffled(random).take(blockedCount)
         for (lane in lanes) {
             val roll = random.nextFloat()
@@ -375,6 +393,35 @@ class GameEngine {
         const val SAFE_START_S = 1.5f     // grace period before the first row
         const val REVIVE_INVINCIBLE_MS = 2000L
 
+        const val REEL_LENGTH = 500f      // meters per silent-film reel (level)
+
+        /**
+         * The 1932 premiere story, told in silent-film title cards.
+         * Our star is late for the biggest cartoon premiere of the year at the
+         * Grand Picture Palace — every 500 meters is another reel of the race
+         * down the old pier.
+         */
+        fun reelTitle(reel: Int): String = when (reel) {
+            1 -> "DOWN AT THE LANDING"
+            2 -> "THE BUSY HARBOR"
+            3 -> "FOG ON THE RIVER"
+            4 -> "THE OLD FOOTBRIDGES"
+            5 -> "PREMIERE NIGHT"
+            else -> "THE SHOW GOES ON"
+        }
+
+        fun reelBlurb(reel: Int): String = when (reel) {
+            1 -> "The year is 1932. The Grand Picture Palace premieres its biggest " +
+                "cartoon tonight \u2014 and our star is running late! Sprint down the old pier!"
+            2 -> "Rowboats crowd the landing \u2014 the whole river is headed to the premiere. " +
+                "Leap 'em and keep moving!"
+            3 -> "Fog rolls in thick as theater curtains. The paddle-wheelers can't see you\u2026 " +
+                "and you can't see them!"
+            4 -> "Duck, star! The crew left every last footbridge down. The show must go on!"
+            5 -> "There it is \u2014 the marquee lights of the Grand Picture Palace! " +
+                "One last sprint down the pier and you're a star!"
+            else -> "The crowd roars for an encore! How long can you keep running?"
+        }
         // collision tuning (world units)
         const val LANE_TOLERANCE = 1.0f
         const val COLLIDE_Z = 1.0f
