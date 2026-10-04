@@ -1,6 +1,6 @@
-# Project Delta — Android Port
+# Pier Pressure — Android Port
 
-Separate native Android port of the Project Delta endless runner (Kotlin + Jetpack Compose, game rendered on Canvas — no engine dependency).
+Separate native Android port of the Pier Pressure endless runner (Kotlin + Jetpack Compose, game rendered on Canvas — no engine dependency).
 
 - Package: `com.emckeon97.projectdelta`
 - Min SDK 26, target SDK 34
