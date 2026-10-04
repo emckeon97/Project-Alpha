@@ -173,14 +173,14 @@ fun GameRenderer(
 
         // ---- pier railings ----
         val railF = Color(0xFF3D332B); val railT = Color(0xFF4A3F36); val railS = Color(0xFF2C251F)
-        drawShadedBox(proj, -3.62f, 1.02f, 1.22f, 29f, 0.16f, 70f, railF, railT, railS)
-        drawShadedBox(proj, 3.62f, 1.02f, 1.22f, 29f, 0.16f, 70f, railF, railT, railS)
+        drawShadedBox(::proj, -3.62f, 1.02f, 1.22f, 29f, 0.16f, 70f, railF, railT, railS)
+        drawShadedBox(::proj, 3.62f, 1.02f, 1.22f, 29f, 0.16f, 70f, railF, railT, railS)
         val postMod = engine.distance % 8f
         var pz = -4f - postMod
         while (pz < 64f) {
             if (pz > -6f) {
-                drawShadedBox(proj, -3.62f, 0f, 1.1f, pz, 0.16f, 0.16f, railF, railT, railS)
-                drawShadedBox(proj, 3.62f, 0f, 1.1f, pz, 0.16f, 0.16f, railF, railT, railS)
+                drawShadedBox(::proj, -3.62f, 0f, 1.1f, pz, 0.16f, 0.16f, railF, railT, railS)
+                drawShadedBox(::proj, 3.62f, 0f, 1.1f, pz, 0.16f, 0.16f, railF, railT, railS)
             }
             pz += 8f
         }
