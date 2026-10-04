@@ -6,7 +6,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="Project Delta"
+        android:label="Pier Pressure"
         android:theme="@style/Theme.ProjectDelta">
 
         <!-- AdMob app ID (Android test app ID; swap for real on release) -->
