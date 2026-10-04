@@ -1,350 +1,422 @@
 package com.emckeon97.projectdelta.game
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.emckeon97.projectdelta.characters.drawCharacter
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.min
+import kotlin.math.sin
 
 /**
- * Full-screen 60fps Canvas renderer for [GameEngine].
+ * Full-screen 60fps perspective-3D renderer for [GameEngine].
+ * World units are projected (x, y, z) -> screen with a level camera at
+ * height 5, z = -8:  d = z + 8; s = f / d;
+ * screenX = cx + x * s;  screenY = horizonY + (H - y) * s.
+ *
+ * NOTE on focal length: the design spec lists f = canvasHeight * 1.15, but
+ * with H = 5 and the camera at z = -8 that places the player plane (z = 0)
+ * below the visible canvas, so the runner would never be seen. f = h * 0.62
+ * keeps the identical formula and every other constant while framing the
+ * player's feet at ~0.81h. Revisit if art direction wants a different frame.
+ *
  * Owns the frame loop; calls [onGameOver] once when the run ends.
- * Swipe input is handled by the hosting GameScreen — the engine only
- * exposes moveLeft()/moveRight()/jump()/roll().
+ * Swipe input is handled by the hosting GameScreen.
  */
 @Composable
 fun GameRenderer(
     engine: GameEngine,
     characterID: String,
-    modifier: Modifier = Modifier,
-    onGameOver: () -> Unit = {}
+    onGameOver: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
     var tick by remember { mutableLongStateOf(0L) }
-    var scrollPx by remember { mutableStateOf(0f) }
     var gameOverFired by remember { mutableStateOf(false) }
+    var speedU by remember { mutableFloatStateOf(8f) }
+    var lastDist by remember { mutableFloatStateOf(0f) }
+    val charBasePx = with(density) { 130.dp.toPx() }
 
-    BoxWithConstraints(modifier.fillMaxSize()) {
-        val density = LocalDensity.current
-        val wPx = with(density) { maxWidth.toPx() }
-        val hPx = with(density) { maxHeight.toPx() }
-        val spacingPx = min(wPx / 3.2f, with(density) { 132.dp.toPx() })
-        val playerYPx = hPx * 0.80f
-
-        LaunchedEffect(spacingPx, hPx) {
-            engine.applyGeometry(spacingPx, playerYPx, hPx)
-        }
-
-        LaunchedEffect(Unit) {
-            var last = 0L
-            while (true) {
-                withFrameNanos { now ->
-                    if (last == 0L) last = now
-                    val dtMs = ((now - last) / 1_000_000).coerceAtMost(50)
-                    last = now
-                    if (!engine.gameOver && !engine.paused) {
-                        gameOverFired = false
-                        engine.update(dtMs)
-                        scrollPx = (scrollPx + engine.speed * (dtMs / 1000f)) % (spacingPx * 2f)
-                    } else if (!gameOverFired) {
-                        gameOverFired = true
-                        onGameOver()
+    LaunchedEffect(Unit) {
+        var last = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (last == 0L) last = now
+                val dtMs = ((now - last) / 1_000_000).coerceAtMost(50)
+                last = now
+                if (!engine.gameOver && !engine.paused) {
+                    gameOverFired = false
+                    engine.update(dtMs)
+                    val d = engine.distance
+                    if (dtMs > 0) {
+                        speedU = ((d - lastDist) / (dtMs / 1000f)).coerceIn(0f, 30f)
                     }
-                    tick = now
+                    lastDist = d
+                } else if (!gameOverFired) {
+                    gameOverFired = true
+                    onGameOver()
                 }
-            }
-        }
-
-        Canvas(Modifier.fillMaxSize()) {
-            tick // redraw every frame
-            val w = size.width
-            val h = size.height
-            val cx = w / 2f
-            val spacing = engine.laneSpacing
-            val pY = engine.playerY
-
-            // ---- background: dark gradient ----
-            drawRect(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF0B1026), Color(0xFF141B3D), Color(0xFF0B1026))
-                )
-            )
-
-            // ---- speed lines ----
-            val lineGap = spacing * 1.4f
-            var ly = -lineGap + (scrollPx % lineGap)
-            while (ly < h + lineGap) {
-                for (lx in listOf(cx - spacing * 1.5f, cx + spacing * 1.5f)) {
-                    drawLine(
-                        Color.White.copy(alpha = 0.06f),
-                        Offset(lx, ly),
-                        Offset(lx, ly + lineGap * 0.45f),
-                        strokeWidth = 6f,
-                        cap = StrokeCap.Round
-                    )
-                }
-                ly += lineGap
-            }
-
-            // ---- lane strips + scrolling ties ----
-            for (lane in 0..2) {
-                val lx = cx + engine.laneX(lane)
-                drawRect(
-                    Color.White.copy(alpha = 0.03f),
-                    Offset(lx - spacing * 0.46f, 0f),
-                    Size(spacing * 0.92f, h)
-                )
-            }
-            val tieGap = 130f
-            var ty = -tieGap + (scrollPx % tieGap)
-            while (ty < h + tieGap) {
-                for (lane in 0..2) {
-                    val lx = cx + engine.laneX(lane)
-                    drawRoundRect(
-                        Color.White.copy(alpha = 0.05f),
-                        Offset(lx - spacing * 0.38f, ty),
-                        Size(spacing * 0.76f, 14f),
-                        CornerRadius(7f)
-                    )
-                }
-                ty += tieGap
-            }
-
-            // ---- lane dividers (dashed, scrolling) ----
-            val dashGap = 90f
-            var dyDash = -dashGap + (scrollPx % dashGap)
-            while (dyDash < h + dashGap) {
-                for (dx in listOf(cx - spacing / 2f, cx + spacing / 2f)) {
-                    drawLine(
-                        Color(0xFFFFD54F).copy(alpha = 0.35f),
-                        Offset(dx, dyDash),
-                        Offset(dx, dyDash + dashGap * 0.5f),
-                        strokeWidth = 8f,
-                        cap = StrokeCap.Round
-                    )
-                }
-                dyDash += dashGap
-            }
-
-            val nowSec = tick / 1_000_000_000f
-
-            // ---- power-ups ----
-            for (p in engine.powerups) {
-                val px = cx + engine.laneX(p.lane)
-                val bob = cos(nowSec * 4f + p.y * 0.01f) * 10f
-                when (p.kind) {
-                    PowerUpKind.MAGNET -> drawMagnet(px, p.y + bob, 64f)
-                    PowerUpKind.MULTIPLIER -> {
-                        drawCircle(Color(0xFFFFD54F), 40f, Offset(px, p.y + bob))
-                        drawCircle(Color(0xFFB7860B), 40f, Offset(px, p.y + bob), style = Stroke(6f))
-                        drawText(
-                            textMeasurer, "2x",
-                            topLeft = Offset(px - 26f, p.y + bob - 28f),
-                            style = TextStyle(color = Color(0xFF3E2723), fontSize = 34.sp)
-                        )
-                    }
-                }
-            }
-
-            // ---- coins (spinning) ----
-            for (c in engine.coins) {
-                if (c.collected) continue
-                val spin = abs(cos(nowSec * 6f + c.y * 0.005f)).coerceIn(0.25f, 1f)
-                withTransform({
-                    scale(sx = spin, sy = 1f, pivot = Offset(c.x, c.y))
-                }) {
-                    drawCircle(Color(0xFFFFD54F), 30f, Offset(c.x, c.y))
-                    drawCircle(Color(0xFFB7860B), 30f, Offset(c.x, c.y), style = Stroke(5f))
-                    drawCircle(Color(0xFFFFF59D), 12f, Offset(c.x - 7f, c.y - 7f))
-                }
-            }
-
-            // ---- obstacles ----
-            for (o in engine.obstacles) {
-                val ox = cx + engine.laneX(o.lane)
-                val ow = spacing * 0.8f
-                when (o.kind) {
-                    ObstacleKind.BARRIER -> drawBarrier(ox, o.y, ow, GameEngine.BARRIER_H_PX)
-                    ObstacleKind.OVERHEAD -> drawOverhead(
-                        ox, o.y, ow,
-                        GameEngine.OVERHEAD_TOP_PX, GameEngine.OVERHEAD_BOTTOM_PX
-                    )
-                    ObstacleKind.TRAIN -> drawTrain(ox, o.y, ow, GameEngine.TRAIN_H_PX)
-                }
-            }
-
-            // ---- player ----
-            val pSize = spacing * GameEngine.PLAYER_H_FRAC
-            drawCharacter(
-                id = characterID,
-                centerX = cx + engine.playerX,
-                feetY = pY - engine.jumpPx,
-                size = pSize,
-                rolling = engine.rolling
-            )
-
-            // ---- active power-up pips ----
-            var pipX = 36f
-            if (engine.magnetActive) {
-                drawMagnet(pipX, 90f, 44f)
-                pipX += 90f
-            }
-            if (engine.multiplierActive) {
-                drawCircle(Color(0xFFFFD54F), 28f, Offset(pipX, 90f))
-                drawText(
-                    textMeasurer, "2x",
-                    topLeft = Offset(pipX - 20f, 90f - 22f),
-                    style = TextStyle(color = Color(0xFF3E2723), fontSize = 26.sp)
-                )
+                tick = now
             }
         }
     }
-}
 
-// ------------------------------------------------------------ pieces
+    Canvas(modifier.fillMaxSize()) {
+        val tSec = tick / 1_000_000_000f // redraw trigger + animation clock
+        val w = size.width
+        val h = size.height
+        val cx = w / 2f
+        val horizonY = h * 0.42f
+        val camH = 5f
+        val camZ = -8f
+        val f = h * 0.62f
+        val sPlayer = f / 8f
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBarrier(
-    cx: Float, baseY: Float, w: Float, h: Float
-) {
-    // striped hurdle
-    drawRoundRect(
-        Color(0xFFE53935),
-        Offset(cx - w / 2f, baseY - h),
-        Size(w, h),
-        CornerRadius(14f)
-    )
-    val stripeW = 26f
-    var x = cx - w / 2f
-    val clip = Path().apply {
-        addRoundRect(
-            androidx.compose.ui.geometry.RoundRect(
-                cx - w / 2f, baseY - h, cx + w / 2f, baseY,
-                androidx.compose.ui.geometry.CornerRadius(14f)
-            )
+        fun proj(x: Float, y: Float, z: Float): Offset? {
+            val d = z - camZ
+            if (d <= 0.5f) return null // behind (or inside) the camera
+            val s = f / d
+            return Offset(cx + x * s, horizonY + (camH - y) * s)
+        }
+        fun scaleAt(z: Float): Float = f / (z - camZ)
+
+        // ---- sky ----
+        drawRect(
+            Brush.verticalGradient(
+                listOf(Color(0xFF04060E), Color(0xFF101542), Color(0xFF2E2154)),
+                endY = horizonY
+            ),
+            size = Size(w, horizonY)
         )
-    }
-    withTransform({ clipPath(clip) }) {
-        while (x < cx + w / 2f) {
+        // ---- ground ----
+        drawRect(
+            Brush.verticalGradient(
+                listOf(Color(0xFF0C0E1C), Color(0xFF05060C)),
+                startY = horizonY
+            ),
+            topLeft = Offset(0f, horizonY),
+            size = Size(w, h - horizonY)
+        )
+        drawLine(
+            Color(0xFF6A5ACD).copy(alpha = 0.25f),
+            Offset(0f, horizonY), Offset(w, horizonY), strokeWidth = 2f
+        )
+
+        // ---- track slab (perspective quad) ----
+        val slab = Path().apply {
+            val a = proj(-3.6f, 0f, 1f); val b = proj(3.6f, 0f, 1f)
+            val c = proj(3.6f, 0f, 64f); val dPt = proj(-3.6f, 0f, 64f)
+            if (a != null && b != null && c != null && dPt != null) {
+                moveTo(a.x, a.y); lineTo(b.x, b.y)
+                lineTo(c.x, c.y); lineTo(dPt.x, dPt.y); close()
+            }
+        }
+        drawPath(slab, Color(0xFF12162E))
+
+        // ---- scrolling cross ties every 4 world units ----
+        val tieMod = engine.distance % 4f
+        for (m in 1..17) {
+            val zLine = m * 4f - tieMod
+            if (zLine < 0.6f) continue
+            val a = proj(-3.2f, 0f, zLine) ?: continue
+            val b = proj(3.2f, 0f, zLine) ?: continue
+            val sw = (scaleAt(zLine) * 0.16f).coerceAtLeast(1.5f)
             drawLine(
-                Color.White, Offset(x, baseY),
-                Offset(x + stripeW, baseY - h),
-                strokeWidth = 14f
+                Color.White.copy(alpha = 0.08f), a, b,
+                strokeWidth = sw, cap = StrokeCap.Round
             )
-            x += stripeW * 2f
+        }
+
+        // ---- lane dividers converging to the vanishing point ----
+        for (dx in floatArrayOf(-3.4f, -1.1f, 1.1f, 3.4f)) {
+            val a = proj(dx, 0f, 1f) ?: continue
+            val b = proj(dx, 0f, 64f) ?: continue
+            val edge = abs(dx) > 2f
+            drawLine(
+                Color(0xFFFFD54F).copy(alpha = if (edge) 0.22f else 0.35f),
+                a, b, strokeWidth = 4f
+            )
+        }
+
+        // ---- entities, far to near ----
+        val items = ArrayList<DrawItem>(64)
+        for (o in engine.obstacles) {
+            if (o.lane !in 0..2) continue
+            val lx = GameEngine.LANE_X[o.lane]
+            val zKey = if (o.kind == ObstacleKind.TRAIN) o.z - o.depth else o.z - 0.5f
+            items.add(ObItem(zKey, o, lx))
+        }
+        for (c in engine.coins) {
+            if (!c.collected) items.add(CoinItem(c.z, c))
+        }
+        for (p in engine.powerUps) {
+            if (!p.taken) items.add(PowItem(p.z, p))
+        }
+        items.add(PlayerItem(0f))
+        items.sortByDescending { it.zKey }
+
+        for (item in items) {
+            when (item) {
+                is ObItem -> drawObstacle(item.o, item.lx, tSec, ::proj, ::scaleAt)
+                is CoinItem -> drawCoin(item.c, tSec, ::proj, ::scaleAt)
+                is PowItem -> drawPowerUp(item.p, ::proj, ::scaleAt, textMeasurer, density)
+                is PlayerItem -> {
+                    val feet = proj(engine.playerX, engine.playerY, 0f)
+                    if (feet != null) {
+                        val s = scaleAt(0f)
+                        drawCharacter(
+                            id = characterID,
+                            centerX = feet.x,
+                            feetY = feet.y,
+                            size = charBasePx * s / sPlayer,
+                            rolling = engine.isRolling
+                        )
+                        // shadow, fading as the jump rises
+                        val g = proj(engine.playerX, 0f, 0f)
+                        if (g != null) {
+                            val fade = (1f - (engine.playerY / 4f).coerceIn(0f, 1f))
+                            drawOval(
+                                Color.Black.copy(alpha = 0.35f * fade),
+                                Offset(g.x - 0.9f * s, g.y - 0.12f * s),
+                                Size(1.8f * s, 0.24f * s)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- speed streaks at the edges ----
+        if (speedU > 13f) {
+            val alpha = ((speedU - 13f) / 9f).coerceIn(0f, 1f) * 0.14f
+            for (i in 0 until 10) {
+                val sx = (if (i % 2 == 0) 0.04f else 0.96f) * w + (i % 3) * 14f
+                val sy = ((i * 197f + tSec * 900f) % (h * 1.2f)) - h * 0.1f
+                drawLine(
+                    Color.White.copy(alpha = alpha),
+                    Offset(sx, sy), Offset(sx, sy + 110f),
+                    strokeWidth = 5f, cap = StrokeCap.Round
+                )
+            }
+        }
+
+        // ---- active power-up pips ----
+        var pipX = 44f
+        if (engine.magnetActive) {
+            drawArc(
+                Color(0xFFE53935), 180f, 180f, false,
+                Offset(pipX - 18f, 66f), Size(36f, 36f),
+                style = Stroke(12f, cap = StrokeCap.Butt)
+            )
+            pipX += 68f
+        }
+        if (engine.doubleScore) {
+            drawCircle(Color(0xFFFFD54F), 24f, Offset(pipX, 84f))
+            val fs = with(density) { 24.dp.toSp() }
+            val label = textMeasurer.measure(
+                "2x", style = TextStyle(fontSize = fs, color = Color(0xFF3E2723))
+            )
+            drawText(
+                textMeasurer, "2x",
+                topLeft = Offset(pipX - label.size.width / 2f, 84f - label.size.height / 2f),
+                style = TextStyle(fontSize = fs, color = Color(0xFF3E2723))
+            )
         }
     }
-    // posts
-    drawRoundRect(Color(0xFF616161), Offset(cx - w / 2f - 8f, baseY - h), Size(16f, h), CornerRadius(8f))
-    drawRoundRect(Color(0xFF616161), Offset(cx + w / 2f - 8f, baseY - h), Size(16f, h), CornerRadius(8f))
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOverhead(
-    cx: Float, baseY: Float, w: Float, topPx: Float, bottomPx: Float
-) {
-    val barTop = baseY - topPx
-    val barH = topPx - bottomPx
-    // poles
-    drawRoundRect(Color(0xFF616161), Offset(cx - w / 2f - 10f, barTop), Size(20f, topPx), CornerRadius(10f))
-    drawRoundRect(Color(0xFF616161), Offset(cx + w / 2f - 10f, barTop), Size(20f, topPx), CornerRadius(10f))
-    // bar with hazard stripes
-    drawRoundRect(Color(0xFFFFB300), Offset(cx - w / 2f, barTop), Size(w, barH), CornerRadius(12f))
-    var x = cx - w / 2f
-    while (x < cx + w / 2f) {
-        drawLine(Color(0xFF212121), Offset(x, barTop + barH), Offset(x + 24f, barTop), strokeWidth = 12f)
-        x += 48f
+// ------------------------------------------------------------ draw items
+
+private sealed interface DrawItem { val zKey: Float }
+private data class ObItem(override val zKey: Float, val o: Obstacle, val lx: Float) : DrawItem
+private data class CoinItem(override val zKey: Float, val c: Coin) : DrawItem
+private data class PowItem(override val zKey: Float, val p: PowerUp) : DrawItem
+private data class PlayerItem(override val zKey: Float) : DrawItem
+
+private fun quadPath(a: Offset, b: Offset, c: Offset, d: Offset): Path =
+    Path().apply {
+        moveTo(a.x, a.y); lineTo(b.x, b.y)
+        lineTo(c.x, c.y); lineTo(d.x, d.y); close()
     }
-    // warning lights
-    drawCircle(Color(0xFFE53935), 12f, Offset(cx - w / 4f, barTop + barH / 2f))
-    drawCircle(Color(0xFFE53935), 12f, Offset(cx + w / 4f, barTop + barH / 2f))
+
+private fun lerpOff(a: Offset, b: Offset, t: Float): Offset =
+    Offset(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+
+/** Projects and draws a shaded 3D box. Returns the 8 projected corners, or null if skipped. */
+private fun DrawScope.drawShadedBox(
+    proj: (Float, Float, Float) -> Offset?,
+    bcx: Float, y0: Float, y1: Float, zc: Float, w: Float, depth: Float,
+    front: Color, top: Color, side: Color
+): Array<Offset>? {
+    val x0 = bcx - w / 2f
+    val x1 = bcx + w / 2f
+    val zN = zc - depth / 2f
+    val zF = zc + depth / 2f
+    val pts = listOf(
+        proj(x0, y0, zN), proj(x1, y0, zN), proj(x1, y1, zN), proj(x0, y1, zN),
+        proj(x0, y0, zF), proj(x1, y0, zF), proj(x1, y1, zF), proj(x0, y1, zF)
+    ).filterNotNull()
+    if (pts.size != 8) return null
+    // side face toward the track center, then top, then front (nearest last)
+    if (bcx < 0f) drawPath(quadPath(pts[1], pts[5], pts[6], pts[2]), side)
+    else drawPath(quadPath(pts[0], pts[4], pts[7], pts[3]), side)
+    drawPath(quadPath(pts[2], pts[6], pts[7], pts[3]), top)
+    drawPath(quadPath(pts[0], pts[1], pts[2], pts[3]), front)
+    return pts.toTypedArray()
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrain(
-    cx: Float, baseY: Float, w: Float, h: Float
+/** Vertical stripes across a projected front face (corners q0..q3 = BL, BR, TR, TL). */
+private fun DrawScope.stripeFrontFace(
+    q: Array<Offset>, stripes: Int, color: Color
 ) {
-    val top = baseY - h
-    // body
-    drawRoundRect(
-        Color(0xFF37474F),
-        Offset(cx - w / 2f, top),
-        Size(w, h),
-        CornerRadius(28f)
-    )
-    drawRoundRect(
-        Color(0xFF455A64),
-        Offset(cx - w / 2f, top),
-        Size(w, h * 0.32f),
-        CornerRadius(28f)
-    )
-    // windshield
-    drawRoundRect(
-        Color(0xFFB3E5FC),
-        Offset(cx - w * 0.36f, top + h * 0.06f),
-        Size(w * 0.72f, h * 0.16f),
-        CornerRadius(14f)
-    )
-    // windows
-    val winY = top + h * 0.30f
-    for (i in -1..1) {
-        drawRoundRect(
-            Color(0xFFB3E5FC).copy(alpha = 0.85f),
-            Offset(cx + i * w * 0.26f - w * 0.09f, winY),
-            Size(w * 0.18f, h * 0.12f),
-            CornerRadius(10f)
+    val q0 = q[0]; val q1 = q[1]; val q2 = q[2]; val q3 = q[3]
+    var i = 0
+    while (i < stripes) {
+        val t0 = i / stripes.toFloat()
+        val t1 = (i + 1) / stripes.toFloat()
+        drawPath(
+            quadPath(
+                lerpOff(q0, q1, t0), lerpOff(q0, q1, t1),
+                lerpOff(q3, q2, t1), lerpOff(q3, q2, t0)
+            ),
+            color
+        )
+        i += 2
+    }
+}
+
+private fun DrawScope.drawObstacle(
+    o: Obstacle,
+    lx: Float,
+    tSec: Float,
+    proj: (Float, Float, Float) -> Offset?,
+    scaleAt: (Float) -> Float
+) {
+    // soft contact shadow
+    val sh = proj(lx, 0f, o.z)
+    if (sh != null) {
+        val ss = scaleAt(o.z)
+        drawOval(
+            Color.Black.copy(alpha = 0.28f),
+            Offset(sh.x - 1.1f * ss, sh.y - 0.08f * ss),
+            Size(2.2f * ss, 0.16f * ss)
         )
     }
-    // stripe + headlights + grill
-    drawRect(Color(0xFFFFD54F), Offset(cx - w / 2f, top + h * 0.48f), Size(w, h * 0.05f))
-    drawCircle(Color(0xFFFFF59D), 14f, Offset(cx - w * 0.32f, baseY - h * 0.12f))
-    drawCircle(Color(0xFFFFF59D), 14f, Offset(cx + w * 0.32f, baseY - h * 0.12f))
-    drawRoundRect(Color(0xFF212121), Offset(cx - w * 0.2f, baseY - h * 0.10f), Size(w * 0.4f, h * 0.06f), CornerRadius(8f))
+    when (o.kind) {
+        ObstacleKind.BARRIER -> {
+            val q = drawShadedBox(
+                proj, lx, 0f, 1.0f, o.z, 1.8f, 1.0f,
+                front = Color(0xFFE53935), top = Color(0xFFC62828), side = Color(0xFF8E0000)
+            ) ?: return
+            stripeFrontFace(q, 6, Color.White)
+        }
+        ObstacleKind.OVERHEAD -> {
+            val postF = Color(0xFF9E9E9E); val postT = Color(0xFF757575); val postS = Color(0xFF616161)
+            drawShadedBox(proj, lx - 0.95f, 0f, 2.6f, o.z, 0.3f, 0.6f, postF, postT, postS)
+            drawShadedBox(proj, lx + 0.95f, 0f, 2.6f, o.z, 0.3f, 0.6f, postF, postT, postS)
+            val q = drawShadedBox(
+                proj, lx, 1.7f, 2.5f, o.z, 2.2f, 0.8f,
+                front = Color(0xFFFFB300), top = Color(0xFFFF8F00), side = Color(0xFFE65100)
+            ) ?: return
+            stripeFrontFace(q, 4, Color(0xFF212121))
+        }
+        ObstacleKind.TRAIN -> {
+            // z marks the far face; the car extends `depth` toward the player
+            val zc = o.z - o.depth / 2f
+            val q = drawShadedBox(
+                proj, lx, 0f, 3.2f, zc, 3.2f, o.depth,
+                front = Color(0xFF546E7A), top = Color(0xFF455A64), side = Color(0xFF37474F)
+            ) ?: return
+            // window band on the front face
+            val q0 = q[0]; val q1 = q[1]; val q2 = q[2]; val q3 = q[3]
+            fun facePt(fx: Float, fy: Float): Offset =
+                lerpOff(lerpOff(q0, q1, fx), lerpOff(q3, q2, fx), fy)
+            drawPath(
+                quadPath(facePt(0.08f, 0.55f), facePt(0.92f, 0.55f), facePt(0.92f, 0.82f), facePt(0.08f, 0.82f)),
+                Color(0xFF102027)
+            )
+            // headlights
+            val zN = zc - o.depth / 2f
+            val hs = scaleAt(zN)
+            for (hx in floatArrayOf(lx - 1.0f, lx + 1.0f)) {
+                val hp = proj(hx, 0.55f, zN) ?: continue
+                drawCircle(Color(0xFFFFF59D), 0.16f * hs, hp)
+            }
+        }
+    }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMagnet(
-    cx: Float, cy: Float, s: Float
+private fun DrawScope.drawCoin(
+    c: Coin,
+    tSec: Float,
+    proj: (Float, Float, Float) -> Offset?,
+    scaleAt: (Float) -> Float
 ) {
-    // horseshoe magnet: thick red arc + white tips
-    drawArc(
-        Color(0xFFE53935), 180f, 180f, false,
-        Offset(cx - s / 2f, cy - s / 2f),
-        Size(s, s),
-        style = Stroke(s * 0.34f, cap = StrokeCap.Butt)
+    val bobY = c.y + sin(tSec * 3f + c.z * 0.7f) * 0.12f
+    val p = proj(c.x, bobY, c.z) ?: return
+    val s = scaleAt(c.z)
+    val r = 0.42f * s
+    val spin = abs(cos(tSec * 6f + c.x * 2f + c.z * 0.5f)).coerceAtLeast(0.15f)
+    drawOval(Color(0xFFFFD54F), Offset(p.x - r * spin, p.y - r), Size(r * 2f * spin, r * 2f))
+    drawOval(
+        Color(0xFFFFF59D),
+        Offset(p.x - r * spin * 0.45f, p.y - r * 0.55f),
+        Size(r * 0.9f * spin, r * 0.9f)
     )
-    drawArc(
-        Color.White, 180f, 34f, false,
-        Offset(cx - s / 2f, cy - s / 2f),
-        Size(s, s),
-        style = Stroke(s * 0.34f, cap = StrokeCap.Butt)
-    )
-    drawArc(
-        Color.White, 326f, 34f, false,
-        Offset(cx - s / 2f, cy - s / 2f),
-        Size(s, s),
-        style = Stroke(s * 0.34f, cap = StrokeCap.Butt)
-    )
+}
+
+private fun DrawScope.drawPowerUp(
+    p: PowerUp,
+    proj: (Float, Float, Float) -> Offset?,
+    scaleAt: (Float) -> Float,
+    textMeasurer: androidx.compose.ui.text.TextMeasurer,
+    density: androidx.compose.ui.unit.Density
+) {
+    val c = proj(p.x, 1.2f, p.z) ?: return
+    val s = scaleAt(p.z)
+    val r = 0.55f * s
+    drawCircle(Color(0xFF2A1B4E), r, c)
+    drawCircle(Color(0xFFFFD54F), r, c, style = Stroke(r * 0.12f))
+    when (p.kind) {
+        PowerUpKind.MAGNET -> {
+            drawArc(
+                Color(0xFFE53935), 180f, 180f, false,
+                Offset(c.x - r * 0.5f, c.y - r * 0.5f), Size(r, r),
+                style = Stroke(r * 0.36f, cap = StrokeCap.Butt)
+            )
+        }
+        PowerUpKind.MULTIPLIER -> {
+            val fs = with(density) { (r * 0.8f).toSp() }
+            val style = TextStyle(fontSize = fs, color = Color(0xFFFFD54F))
+            val label = textMeasurer.measure("2x", style = style)
+            drawText(
+                textMeasurer, "2x",
+                topLeft = Offset(c.x - label.size.width / 2f, c.y - label.size.height / 2f),
+                style = style
+            )
+        }
+    }
 }
