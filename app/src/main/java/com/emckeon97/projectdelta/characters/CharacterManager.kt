@@ -14,11 +14,11 @@ class CharacterManager(context: Context) {
     private val _coins = MutableStateFlow(prefs.getInt(KEY_COINS, 0))
     val coins: StateFlow<Int> = _coins
 
-    private val _selectedID = MutableStateFlow(prefs.getString(KEY_SELECTED, "willie") ?: "willie")
+    private val _selectedID = MutableStateFlow(prefs.getString(KEY_SELECTED, "popeye") ?: "popeye")
     val selectedID: StateFlow<String> = _selectedID
 
     private val _unlockedIDs =
-        MutableStateFlow(prefs.getStringSet(KEY_UNLOCKED, setOf("willie")) ?: setOf("willie"))
+        MutableStateFlow(prefs.getStringSet(KEY_UNLOCKED, setOf("popeye")) ?: setOf("popeye"))
     val unlockedIDs: StateFlow<Set<String>> = _unlockedIDs
 
     private val _highScore = MutableStateFlow(prefs.getInt(KEY_HIGHSCORE, 0))
