@@ -56,8 +56,16 @@ object MusicManager {
         }
     }
 
-    fun toggleMute(context: Context) {
-        ensurePrefs(context)
+    /** Pauses the loop (app backgrounded). Resume with [play]. */
+    fun pause() {
+        try {
+            player?.pause()
+        } catch (_: Exception) {
+            // no-op
+        }
+    }
+
+    fun toggleMute(context: Context) {        ensurePrefs(context)
         val muted = !_isMuted.value
         _isMuted.value = muted
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
