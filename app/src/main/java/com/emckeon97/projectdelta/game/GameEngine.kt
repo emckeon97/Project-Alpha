@@ -46,7 +46,8 @@ class GameEngine {
     var isRolling: Boolean = false
         private set
     private var playerState: PlayerState = PlayerState.RUNNING
-    private var stateT: Float = 0f          // seconds in current state
+    var stateT: Float = 0f                  // seconds in current state
+        private set
 
     // ---- run state ----
     /** World scroll speed, units/s. */
