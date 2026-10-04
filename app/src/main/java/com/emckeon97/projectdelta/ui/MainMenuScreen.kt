@@ -80,7 +80,7 @@ fun MainMenuScreen(navController: NavController, characterManager: CharacterMana
                 )
                 MarqueeLights(modifier = Modifier.padding(vertical = 10.dp))
                 Text(
-                    text = "PROJECT DELTA",
+                    text = "PIER PRESSURE",
                     color = DeltaTheme.cream,
                     fontSize = 44.sp,
                     fontWeight = FontWeight.Black,
