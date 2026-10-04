@@ -210,7 +210,8 @@ class GameEngine {
         rowTimer -= dt
         if (rowTimer <= 0f) {
             spawnRow()
-            rowTimer = maxOf(0.55f, 9f / scrollSpeed)
+            // breathing room: ~13 world units between rows at cruise, more at speed
+            rowTimer = maxOf(0.7f, 13f / scrollSpeed)
         }
         coinTimer -= dt
         if (coinTimer <= 0f) {
