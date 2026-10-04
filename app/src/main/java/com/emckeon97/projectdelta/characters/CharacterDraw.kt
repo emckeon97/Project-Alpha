@@ -206,7 +206,7 @@ private fun DrawScope.drawFelix(cx: Float, feetY: Float, s: Float) {
     // tail (curved)
     val tail = Path().apply {
         moveTo(cx + s * 0.14f, feetY - s * 0.30f)
-        quadraticBezierTo(cx + s * 0.42f, feetY - s * 0.34f, cx + s * 0.38f, feetY - s * 0.58f)
+        quadraticTo(cx + s * 0.42f, feetY - s * 0.34f, cx + s * 0.38f, feetY - s * 0.58f)
     }
     drawPath(tail, ink, style = Stroke(lw * 1.6f, cap = StrokeCap.Round))
     // feet
