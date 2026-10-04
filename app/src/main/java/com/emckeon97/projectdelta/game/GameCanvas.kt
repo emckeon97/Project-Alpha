@@ -102,7 +102,8 @@ fun GameRenderer(
                     if (wasAirborne && !airborne && !engine.isRolling) landT = 0f
                     wasAirborne = airborne
                     if (landT < 0.22f) landT += dtSec
-                } else if (!gameOverFired) {
+                } else if (engine.gameOver && !gameOverFired) {
+                    // Game over fires ONLY on a real collision — never on pause.
                     gameOverFired = true
                     onGameOver()
                 }
