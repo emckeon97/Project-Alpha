@@ -3,11 +3,15 @@ package com.emckeon97.projectdelta.characters
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 private val ink = Color(0xFF161616)
 private val paper = Color(0xFFFFFFFF)
@@ -21,6 +25,9 @@ private val brown = Color(0xFF6D4C41)
  * Rubber-hose cartoon rendering of the public-domain roster.
  * All likenesses are original code-drawn interpretations.
  *
+ * Characters with bundled sprite art ([sprite] != null) draw the bitmap;
+ * willie/betty/minnie have no PNGs and keep the primitive drawing below.
+ *
  * @param centerX horizontal center of the character (px)
  * @param feetY y of the character's feet / ground contact (px)
  * @param size total character height (px)
@@ -31,10 +38,15 @@ fun DrawScope.drawCharacter(
     centerX: Float,
     feetY: Float,
     size: Float,
-    rolling: Boolean
+    rolling: Boolean,
+    sprite: ImageBitmap? = null
 ) {
     if (rolling) {
         drawRollBall(id, centerX, feetY, size)
+        return
+    }
+    if (sprite != null) {
+        drawSpriteCharacter(sprite, centerX, feetY, size)
         return
     }
     when (id) {
@@ -46,6 +58,22 @@ fun DrawScope.drawCharacter(
         "betty" -> drawBetty(centerX, feetY, size)
         else -> drawWillie(centerX, feetY, size)
     }
+}
+
+/** Draws a bundled sprite bitmap, ~[size] px tall, aspect-preserved, feet at [feetY]. */
+private fun DrawScope.drawSpriteCharacter(
+    sprite: ImageBitmap,
+    centerX: Float,
+    feetY: Float,
+    size: Float
+) {
+    val h = size
+    val w = h * sprite.width / sprite.height
+    drawImage(
+        image = sprite,
+        dstOffset = IntOffset((centerX - w / 2f).roundToInt(), (feetY - h).roundToInt()),
+        dstSize = IntSize(w.roundToInt(), h.roundToInt())
+    )
 }
 
 // ---------------------------------------------------------------- helpers
