@@ -302,19 +302,35 @@ fun GameRenderer(
                     val feet = proj(engine.playerX, engine.playerY + bobY, 0f)
                     if (feet != null) {
                         val s = scaleAt(0f)
-                        // jump stretch / land squash (never while rolling)
+                        // --- cartoon squash & stretch ---
                         var sx = 1f
                         var sy = 1f
-                        if (!engine.isRolling) {
+                        var spin = 0f
+                        if (engine.isRolling) {
+                            // roll: two full tumbles across the roll, slight tuck mid-roll
+                            val rt = (engine.stateT / GameEngine.ROLL_TIME).coerceIn(0f, 1f)
+                            spin = rt * 720f
+                            val tuck = sin(PI.toFloat() * rt)
+                            sx = 1f + 0.06f * tuck
+                            sy = 1f - 0.10f * tuck
+                        } else {
                             if (engine.playerY > 0.02f) {
-                                val js = (engine.playerY / GameEngine.JUMP_HEIGHT).coerceIn(0f, 1f)
-                                sx = 1f - 0.07f * js
-                                sy = 1f + 0.10f * js
+                                // jump: stretch peaks mid-air
+                                val jt = (engine.stateT / GameEngine.JUMP_TIME).coerceIn(0f, 1f)
+                                val stretch = sin(PI.toFloat() * jt)
+                                sx = 1f - 0.16f * stretch
+                                sy = 1f + 0.28f * stretch
                             } else if (landT < 0.22f) {
+                                // landing: squash, then recover
                                 val k = 1f - landT / 0.22f
-                                sx = 1f + 0.10f * k
-                                sy = 1f - 0.16f * k
+                                sx = 1f + 0.14f * k
+                                sy = 1f - 0.22f * k
                             }
+                            // slide: stretch sideways while changing lanes
+                            val lateral = GameEngine.LANE_X[engine.playerLane] - engine.playerX
+                            val slideK = (abs(lateral) / 2.2f).coerceIn(0f, 1f)
+                            sx += 0.16f * slideK
+                            sy -= 0.06f * slideK
                         }
                         val pivot = Offset(feet.x, feet.y)
                         withTransform({
@@ -328,6 +344,7 @@ fun GameRenderer(
                                 feetY = feet.y,
                                 size = charBasePx * s / sPlayer,
                                 rolling = engine.isRolling,
+                                rollSpin = spin,
                                 sprite = spriteBitmap
                             )
                         }
