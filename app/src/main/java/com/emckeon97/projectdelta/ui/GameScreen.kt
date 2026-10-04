@@ -67,6 +67,82 @@ private fun HudPill(text: String) {
 /** Minimum drag distance (px) before a swipe registers. */
 private const val SWIPE_THRESHOLD = 60f
 
+/** First-run how-to-play card. */
+@Composable
+private fun HowToPlayCard(onDismiss: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.78f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 40.dp)
+                .border(2.dp, DeltaTheme.gold, RoundedCornerShape(4.dp))
+                .background(DeltaTheme.ink)
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "HOW TO PLAY",
+                color = DeltaTheme.gold,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Serif,
+                letterSpacing = 3.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            HowToRow("\u2190 \u2192", "Swipe sideways to change lanes")
+            HowToRow("\u2191", "Swipe up to leap the rowboats")
+            HowToRow("\u2193", "Swipe down to roll under the footbridges")
+            HowToRow("\uD83D\uDEA2", "Dodge the paddle-wheelers!")
+            Spacer(modifier = Modifier.height(20.dp))
+            Button(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = DeltaTheme.gold,
+                    contentColor = DeltaTheme.ink
+                )
+            ) {
+                Text(
+                    text = "ROLL FILM",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Serif,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 10.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HowToRow(glyph: String, text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = glyph,
+            color = DeltaTheme.gold,
+            fontSize = 22.sp,
+            modifier = Modifier.width(56.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        Text(
+            text = text,
+            color = DeltaTheme.cream.copy(alpha = 0.9f),
+            fontSize = 16.sp,
+            fontFamily = FontFamily.Serif
+        )
+    }
+}
+
 /** Silent-film title card shown when a new reel (level) begins. */
 @Composable
 private fun ReelTitleCard(reel: Int) {
@@ -128,6 +204,8 @@ fun GameScreen(
     // HUD mirrors of the engine's plain-Kotlin fields.
     var hudScore by remember { mutableIntStateOf(0) }
     var hudCoins by remember { mutableIntStateOf(0) }
+    // First-run how-to-play.
+    var showHowTo by remember { mutableStateOf(!characterManager.sawHowTo) }
     // Silent-film reel title card.
     var reelCard by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(reelCard) {
@@ -140,6 +218,7 @@ fun GameScreen(
     LaunchedEffect(revive) {
         engine.paused = false
         if (revive) engine.revive() else engine.reset()
+        if (showHowTo) engine.paused = true
         ready = true
     }
     // Lightweight per-frame read of the engine's score/coins for the HUD.
@@ -232,6 +311,15 @@ fun GameScreen(
 
         // Silent-film reel title card (auto-dismisses; doesn't block swipes)
         reelCard?.let { ReelTitleCard(reel = it) }
+
+        // First-run how-to-play (pauses the engine until dismissed)
+        if (showHowTo) {
+            HowToPlayCard(onDismiss = {
+                characterManager.sawHowTo = true
+                showHowTo = false
+                engine.paused = false
+            })
+        }
 
         if (paused) {
             AlertDialog(                onDismissRequest = { /* force an explicit choice */ },
