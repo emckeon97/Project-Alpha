@@ -144,8 +144,8 @@ fun GameRenderer(
             Offset(0f, horizonY), Offset(w, horizonY), strokeWidth = 2f
         )
 
-        // ---- track slab (perspective quad) ----
-        // Near edge starts behind the camera plane so the track fills the
+        // ---- wooden pier deck (perspective quad) ----
+        // Near edge starts behind the camera plane so the bridge fills the
         // bottom of the screen (no black strip below the player).
         val slab = Path().apply {
             val a = proj(-3.6f, 0f, -6f); val b = proj(3.6f, 0f, -6f)
@@ -155,20 +155,34 @@ fun GameRenderer(
                 lineTo(c.x, c.y); lineTo(dPt.x, dPt.y); close()
             }
         }
-        drawPath(slab, Color(0xFF12162E))
+        drawPath(slab, Color(0xFF33291F))
 
-        // ---- scrolling cross ties every 4 world units ----
-        val tieMod = engine.distance % 4f
-        for (m in -1..17) {
-            val zLine = m * 4f - tieMod
+        // ---- deck planks scrolling under the player ----
+        val plankMod = engine.distance % 2f
+        for (m in -3..33) {
+            val zLine = m * 2f - plankMod
             if (zLine < -6f) continue
-            val a = proj(-3.2f, 0f, zLine) ?: continue
-            val b = proj(3.2f, 0f, zLine) ?: continue
-            val sw = (scaleAt(zLine) * 0.16f).coerceAtLeast(1.5f)
+            val a = proj(-3.55f, 0f, zLine) ?: continue
+            val b = proj(3.55f, 0f, zLine) ?: continue
+            val sw = (scaleAt(zLine) * 0.45f).coerceIn(1.5f, 30f)
             drawLine(
-                Color.White.copy(alpha = 0.08f), a, b,
-                strokeWidth = sw, cap = StrokeCap.Round
+                Color(0xFF5C4F45).copy(alpha = 0.85f), a, b,
+                strokeWidth = sw, cap = StrokeCap.Butt
             )
+        }
+
+        // ---- pier railings ----
+        val railF = Color(0xFF3D332B); val railT = Color(0xFF4A3F36); val railS = Color(0xFF2C251F)
+        drawShadedBox(proj, -3.62f, 1.02f, 1.22f, 29f, 0.16f, 70f, railF, railT, railS)
+        drawShadedBox(proj, 3.62f, 1.02f, 1.22f, 29f, 0.16f, 70f, railF, railT, railS)
+        val postMod = engine.distance % 8f
+        var pz = -4f - postMod
+        while (pz < 64f) {
+            if (pz > -6f) {
+                drawShadedBox(proj, -3.62f, 0f, 1.1f, pz, 0.16f, 0.16f, railF, railT, railS)
+                drawShadedBox(proj, 3.62f, 0f, 1.1f, pz, 0.16f, 0.16f, railF, railT, railS)
+            }
+            pz += 8f
         }
 
         // ---- lane dividers converging to the vanishing point ----
@@ -177,7 +191,7 @@ fun GameRenderer(
             val b = proj(dx, 0f, 64f) ?: continue
             val edge = abs(dx) > 2f
             drawLine(
-                Color(0xFFFFD54F).copy(alpha = if (edge) 0.22f else 0.35f),
+                Color(0xFFFFD54F).copy(alpha = if (edge) 0.15f else 0.25f),
                 a, b, strokeWidth = 4f
             )
         }
