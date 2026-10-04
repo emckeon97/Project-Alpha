@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.min
@@ -32,6 +33,7 @@ private val brown = Color(0xFF6D4C41)
  * @param feetY y of the character's feet / ground contact (px)
  * @param size total character height (px)
  * @param rolling when true, draws a compact tumbling ball instead
+ * @param rollSpin rotation of the tumbling ball, in degrees
  */
 fun DrawScope.drawCharacter(
     id: String,
@@ -39,10 +41,11 @@ fun DrawScope.drawCharacter(
     feetY: Float,
     size: Float,
     rolling: Boolean,
+    rollSpin: Float = 0f,
     sprite: ImageBitmap? = null
 ) {
     if (rolling) {
-        drawRollBall(id, centerX, feetY, size)
+        drawRollBall(id, centerX, feetY, size, spin = rollSpin)
         return
     }
     if (sprite != null) {
@@ -125,7 +128,7 @@ private fun DrawScope.smile(cx: Float, cy: Float, w: Float, color: Color = ink, 
 
 // ------------------------------------------------------- rolling ball
 
-private fun DrawScope.drawRollBall(id: String, cx: Float, feetY: Float, size: Float) {
+private fun DrawScope.drawRollBall(id: String, cx: Float, feetY: Float, size: Float, spin: Float = 0f) {
     val r = size * 0.30f
     val cy = feetY - r
     val base = when (id) {
@@ -136,28 +139,31 @@ private fun DrawScope.drawRollBall(id: String, cx: Float, feetY: Float, size: Fl
         "oswald" -> Color(0xFF2B2B2B)
         else -> ink
     }
-    // motion streaks
+    // motion streaks (static speed lines)
     limb(Offset(cx - r * 1.6f, cy - r * 0.4f), Offset(cx - r * 1.1f, cy - r * 0.4f), r * 0.16f, paper.copy(alpha = 0.5f))
     limb(Offset(cx - r * 1.7f, cy + r * 0.3f), Offset(cx - r * 1.1f, cy + r * 0.3f), r * 0.16f, paper.copy(alpha = 0.5f))
-    drawCircle(base, r, Offset(cx, cy))
-    drawCircle(ink, r, Offset(cx, cy), style = Stroke(r * 0.12f))
-    // signature accent so the ball still reads as the character
-    when (id) {
-        "willie", "felix", "oswald" -> {
-            drawCircle(paper, r * 0.42f, Offset(cx, cy - r * 0.1f))
-            pieEye(cx - r * 0.16f, cy - r * 0.14f, r * 0.16f)
-            pieEye(cx + r * 0.16f, cy - r * 0.14f, r * 0.16f)
-        }
-        "popeye" -> {
-            drawCircle(paper, r * 0.5f, Offset(cx, cy))
-            rrect(paper, cx, cy - r * 1.05f, r * 0.9f, r * 0.34f, r * 0.12f)
-        }
-        "pooh" -> {
-            drawCircle(toonRed, r * 0.55f, Offset(cx, cy + r * 0.25f))
-        }
-        "betty" -> {
-            drawCircle(ink, r * 0.62f, Offset(cx, cy - r * 0.28f))
-            drawCircle(paper, r * 0.4f, Offset(cx, cy + r * 0.05f))
+    // the ball itself tumbles around its own center
+    withTransform({ rotate(spin, pivot = Offset(cx, cy)) }) {
+        drawCircle(base, r, Offset(cx, cy))
+        drawCircle(ink, r, Offset(cx, cy), style = Stroke(r * 0.12f))
+        // signature accent so the ball still reads as the character
+        when (id) {
+            "willie", "felix", "oswald" -> {
+                drawCircle(paper, r * 0.42f, Offset(cx, cy - r * 0.1f))
+                pieEye(cx - r * 0.16f, cy - r * 0.14f, r * 0.16f)
+                pieEye(cx + r * 0.16f, cy - r * 0.14f, r * 0.16f)
+            }
+            "popeye" -> {
+                drawCircle(paper, r * 0.5f, Offset(cx, cy))
+                rrect(paper, cx, cy - r * 1.05f, r * 0.9f, r * 0.34f, r * 0.12f)
+            }
+            "pooh" -> {
+                drawCircle(toonRed, r * 0.55f, Offset(cx, cy + r * 0.25f))
+            }
+            "betty" -> {
+                drawCircle(ink, r * 0.62f, Offset(cx, cy - r * 0.28f))
+                drawCircle(paper, r * 0.4f, Offset(cx, cy + r * 0.05f))
+            }
         }
     }
 }
