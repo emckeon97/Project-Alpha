@@ -75,5 +75,11 @@ class CharacterManager(context: Context) {
         private const val KEY_SELECTED = "delta.selected"
         private const val KEY_UNLOCKED = "delta.unlocked"
         private const val KEY_HIGHSCORE = "delta.highscore"
+        private const val KEY_SAW_HOWTO = "delta.sawHowTo"
     }
+
+    /** First-run how-to-play. True once the player has dismissed it. */
+    var sawHowTo: Boolean
+        get() = prefs.getBoolean(KEY_SAW_HOWTO, false)
+        set(value) = prefs.edit().putBoolean(KEY_SAW_HOWTO, value).apply()
 }
