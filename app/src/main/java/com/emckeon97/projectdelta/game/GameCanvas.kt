@@ -26,6 +26,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import com.emckeon97.projectdelta.characters.ROSTER
 import com.emckeon97.projectdelta.characters.drawCharacter
 import com.emckeon97.projectdelta.characters.rememberSpriteBitmap
 import kotlin.math.abs
@@ -68,6 +69,13 @@ fun GameRenderer(
     var wasAirborne by remember { mutableStateOf(false) }
     val spriteBitmap = rememberSpriteBitmap(characterID)
     val charBasePx = with(density) { 130.dp.toPx() }
+    // Background cameos: 3 random roster characters (never the player), matching iOS.
+    val cameoIds = remember(characterID) {
+        ROSTER.map { it.id }.filter { it != characterID }.shuffled().take(3)
+    }
+    val cameoSprite0 = rememberSpriteBitmap(cameoIds[0])
+    val cameoSprite1 = rememberSpriteBitmap(cameoIds[1])
+    val cameoSprite2 = rememberSpriteBitmap(cameoIds[2])
 
     LaunchedEffect(Unit) {
         var last = 0L
@@ -144,6 +152,15 @@ fun GameRenderer(
             Offset(0f, horizonY), Offset(w, horizonY), strokeWidth = 2f
         )
 
+        // ---- distant riverboat (ambient life, matches iOS) ----
+        val boatX = 16f + sin(tSec * 0.1f) * 3f
+        val boatZ = 80f
+        val boatHullF = Color(0xFF1A2030); val boatHullT = Color(0xFF232B40); val boatHullS = Color(0xFF11141F)
+        val boatCabF = Color(0xFF8E93A6); val boatCabT = Color(0xFFA6ACBF); val boatCabS = Color(0xFF6B7085)
+        drawShadedBox(::proj, boatX, 0f, 1.5f, boatZ, 8f, 20f, boatHullF, boatHullT, boatHullS)
+        drawShadedBox(::proj, boatX, 1.5f, 4f, boatZ, 6f, 14f, boatCabF, boatCabT, boatCabS)
+        drawShadedBox(::proj, boatX - 1.5f, 4f, 7f, boatZ - 2f, 1f, 1f, boatHullF, boatHullT, boatHullS)
+
         // ---- wooden pier deck (perspective quad) ----
         // Near edge starts behind the camera plane so the bridge fills the
         // bottom of the screen (no black strip below the player).
@@ -194,6 +211,22 @@ fun GameRenderer(
                 Color(0xFFFFD54F).copy(alpha = if (edge) 0.15f else 0.25f),
                 a, b, strokeWidth = 4f
             )
+        }
+
+        // ---- background cameos: 2 waving from the pier edges, 1 on the riverboat ----
+        val cameoSprites = listOf(cameoSprite0, cameoSprite1, cameoSprite2)
+        val cameoSpots = listOf(
+            Triple(-3.3f, 0f, 16f),
+            Triple(3.3f, 0f, 16f),
+            Triple(boatX, 4.2f, boatZ)
+        )
+        for (i in cameoSpots.indices) {
+            val (cx, cy, cz) = cameoSpots[i]
+            val bobY = cy + sin(tSec * 2.8f + i * 2.1f) * 0.12f
+            val p = proj(cx, bobY, cz) ?: continue
+            val sizeMul = if (i == 2) 2.2f else 1f
+            val size = charBasePx * 8f / (cz + 8f) * sizeMul
+            drawCharacter(cameoIds[i], p.x, p.y, size, rolling = false, sprite = cameoSprites[i])
         }
 
         // ---- entities, far to near ----
