@@ -31,6 +31,7 @@ import com.emckeon97.projectdelta.characters.rememberSpriteBitmap
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.PI
 import kotlin.math.sin
 
 /**
@@ -368,45 +369,106 @@ private fun DrawScope.drawObstacle(
             Size(2.2f * ss, 0.16f * ss)
         )
     }
+    // 1930s steamboat-river palette (matches iOS)
+    val woodF = Color(0xFF5C4F45); val woodT = Color(0xFF6B5D4F); val woodS = Color(0xFF463C33)
+    val woodDarkF = Color(0xFF3D332B); val woodDarkT = Color(0xFF4A3F36); val woodDarkS = Color(0xFF2C251F)
+    val hullF = Color(0xFF1C1C1E); val hullT = Color(0xFF2A2A2C); val hullS = Color(0xFF101012)
+    val cabinF = Color(0xFFB5B0A6); val cabinT = Color(0xFFCFC9BC); val cabinS = Color(0xFF8E887A)
+    val trimF = Color(0xFF7A7468); val trimT = Color(0xFF8E887A); val trimS = Color(0xFF5C574C)
+    val stackF = Color(0xFF141414); val stackT = Color(0xFF1E1E1E); val stackS = Color(0xFF0A0A0A)
+    val warm = Color(0xFFFFEBBF)
+    val wheelRed = Color(0xFF9E2924)
+    val smoke = Color(0xFFB0A89C).copy(alpha = 0.45f)
     when (o.kind) {
+        // Rowboat drifting across the pier — jump it (top at y≈1.0).
         ObstacleKind.BARRIER -> {
-            val q = drawShadedBox(
-                proj, lx, 0f, 1.0f, o.z, 1.8f, 1.0f,
-                front = Color(0xFFE53935), top = Color(0xFFC62828), side = Color(0xFF8E0000)
-            ) ?: return
-            stripeFrontFace(q, 6, Color.White)
+            drawShadedBox(proj, lx, 0.15f, 0.85f, o.z, 2.6f, 1.2f, woodF, woodT, woodS) ?: return
+            // tapered bow / stern
+            drawShadedBox(proj, lx - 1.45f, 0.2f, 0.8f, o.z, 0.7f, 1.0f, woodF, woodT, woodS)
+            drawShadedBox(proj, lx + 1.45f, 0.2f, 0.8f, o.z, 0.7f, 1.0f, woodF, woodT, woodS)
+            // gunwale rim
+            drawShadedBox(proj, lx, 0.84f, 0.96f, o.z, 2.75f, 1.3f, woodDarkF, woodDarkT, woodDarkS)
+            // bench seats
+            drawShadedBox(proj, lx - 0.55f, 0.7f, 0.78f, o.z, 0.28f, 1.05f, woodDarkF, woodDarkT, woodDarkS)
+            drawShadedBox(proj, lx + 0.55f, 0.7f, 0.78f, o.z, 0.28f, 1.05f, woodDarkF, woodDarkT, woodDarkS)
+            // oar resting across the boat
+            drawShadedBox(proj, lx + 0.1f, 0.95f, 1.02f, o.z, 2.4f, 0.07f, woodDarkF, woodDarkT, woodDarkS)
         }
+        // Low wooden footbridge — roll under it (beam spans y 1.7–2.1).
         ObstacleKind.OVERHEAD -> {
-            val postF = Color(0xFF9E9E9E); val postT = Color(0xFF757575); val postS = Color(0xFF616161)
-            drawShadedBox(proj, lx - 0.95f, 0f, 2.6f, o.z, 0.3f, 0.6f, postF, postT, postS)
-            drawShadedBox(proj, lx + 0.95f, 0f, 2.6f, o.z, 0.3f, 0.6f, postF, postT, postS)
+            drawShadedBox(proj, lx - 1.05f, 0f, 2.6f, o.z, 0.22f, 0.22f, woodF, woodT, woodS)
+            drawShadedBox(proj, lx + 1.05f, 0f, 2.6f, o.z, 0.22f, 0.22f, woodF, woodT, woodS)
             val q = drawShadedBox(
-                proj, lx, 1.7f, 2.5f, o.z, 2.2f, 0.8f,
-                front = Color(0xFFFFB300), top = Color(0xFFFF8F00), side = Color(0xFFE65100)
+                proj, lx, 1.72f, 2.08f, o.z, 2.35f, 0.9f, woodF, woodT, woodS
             ) ?: return
-            stripeFrontFace(q, 4, Color(0xFF212121))
+            stripeFrontFace(q, 5, woodDarkF) // plank seams
+            // hanging lantern — a warm glow in the monochrome world
+            drawShadedBox(proj, lx, 1.42f, 1.72f, o.z, 0.05f, 0.05f, woodDarkF, woodDarkT, woodDarkS)
+            val lp = proj(lx, 1.38f, o.z)
+            if (lp != null) {
+                val ls = scaleAt(o.z)
+                drawCircle(warm.copy(alpha = 0.25f), 0.34f * ls, lp)
+                drawCircle(warm, 0.14f * ls, lp)
+            }
         }
+        // Paddle-wheeler steamboat blocking the lane — dodge! (~3.2 tall, 6 long).
         ObstacleKind.TRAIN -> {
-            // z marks the far face; the car extends `depth` toward the player
-            val zc = o.z - o.depth / 2f
-            val q = drawShadedBox(
-                proj, lx, 0f, 3.2f, zc, 3.2f, o.depth,
-                front = Color(0xFF546E7A), top = Color(0xFF455A64), side = Color(0xFF37474F)
-            ) ?: return
-            // window band on the front face
-            val q0 = q[0]; val q1 = q[1]; val q2 = q[2]; val q3 = q[3]
-            fun facePt(fx: Float, fy: Float): Offset =
-                lerpOff(lerpOff(q0, q1, fx), lerpOff(q3, q2, fx), fy)
-            drawPath(
-                quadPath(facePt(0.08f, 0.55f), facePt(0.92f, 0.55f), facePt(0.92f, 0.82f), facePt(0.08f, 0.82f)),
-                Color(0xFF102027)
-            )
-            // headlights
-            val zN = zc - o.depth / 2f
-            val hs = scaleAt(zN)
-            for (hx in floatArrayOf(lx - 1.0f, lx + 1.0f)) {
-                val hp = proj(hx, 0.55f, zN) ?: continue
-                drawCircle(Color(0xFFFFF59D), 0.16f * hs, hp)
+            // z marks the far face; the boat extends `depth` toward the player
+            val depth = o.depth
+            val zc = o.z - depth / 2f
+            drawShadedBox(proj, lx, 0f, 1.0f, zc, 2.0f, depth, hullF, hullT, hullS) ?: return
+            // tapered bow at the near end
+            drawShadedBox(proj, lx, 0f, 0.9f, zc - 2.4f, 1.4f, 1.2f, hullF, hullT, hullS)
+            // stacked cabins
+            val q = drawShadedBox(proj, lx, 1.0f, 1.9f, zc, 1.7f, 4.6f, cabinF, cabinT, cabinS)
+            drawShadedBox(proj, lx, 1.9f, 2.02f, zc, 1.9f, 4.8f, trimF, trimT, trimS)
+            drawShadedBox(proj, lx, 2.02f, 2.7f, zc, 1.4f, 3.4f, cabinF, cabinT, cabinS)
+            drawShadedBox(proj, lx, 2.7f, 2.82f, zc, 1.6f, 3.6f, trimF, trimT, trimS)
+            // lit cabin windows (warm dots in the monochrome world)
+            if (q != null) {
+                val q0 = q[0]; val q1 = q[1]; val q2 = q[2]; val q3 = q[3]
+                fun facePt(fx: Float, fy: Float): Offset =
+                    lerpOff(lerpOff(q0, q1, fx), lerpOff(q3, q2, fx), fy)
+                fun window(fx0: Float, fx1: Float) {
+                    drawPath(
+                        quadPath(
+                            facePt(fx0, 0.3f), facePt(fx1, 0.3f),
+                            facePt(fx1, 0.62f), facePt(fx0, 0.62f)
+                        ),
+                        warm
+                    )
+                }
+                window(0.14f, 0.30f); window(0.42f, 0.58f); window(0.70f, 0.86f)
+            }
+            // smokestacks with caps (rear)
+            val stackZ = zc - 1.2f
+            drawShadedBox(proj, lx - 0.4f, 2.82f, 4.1f, stackZ, 0.36f, 0.36f, stackF, stackT, stackS)
+            drawShadedBox(proj, lx + 0.4f, 2.82f, 4.1f, stackZ, 0.36f, 0.36f, stackF, stackT, stackS)
+            drawShadedBox(proj, lx - 0.4f, 4.1f, 4.25f, stackZ, 0.48f, 0.48f, stackF, stackT, stackS)
+            drawShadedBox(proj, lx + 0.4f, 4.1f, 4.25f, stackZ, 0.48f, 0.48f, stackF, stackT, stackS)
+            // drifting smoke puffs
+            val sSmoke = scaleAt(stackZ)
+            val puffX = floatArrayOf(lx - 0.4f, lx + 0.4f, lx)
+            for (i in 0..2) {
+                val px = puffX[i] + sin(tSec * 1.3f + i * 2.1f) * 0.18f
+                val py = 4.55f + i * 0.38f
+                val pp = proj(px, py, stackZ) ?: continue
+                drawCircle(smoke, (0.30f + i * 0.13f) * sSmoke, pp)
+            }
+            // paddle wheel on the visible side (the one red accent)
+            val side = if (lx < 0f) 1f else -1f
+            val wp = proj(lx + side * 1.02f, 0.95f, zc)
+            if (wp != null) {
+                val ws = scaleAt(zc)
+                val wr = 0.75f * ws
+                drawCircle(wheelRed, wr, wp, style = Stroke(width = 0.13f * ws))
+                for (i in 0..3) {
+                    val a = i * PI.toFloat() / 4f
+                    val ex = wp.x + cos(a) * wr
+                    val ey = wp.y + sin(a) * wr
+                    drawLine(wheelRed, wp, Offset(ex, ey), strokeWidth = 0.07f * ws)
+                }
+                drawCircle(wheelRed, 0.12f * ws, wp)
             }
         }
     }
