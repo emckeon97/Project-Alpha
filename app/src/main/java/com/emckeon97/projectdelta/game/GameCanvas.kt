@@ -145,8 +145,10 @@ fun GameRenderer(
         )
 
         // ---- track slab (perspective quad) ----
+        // Near edge starts behind the camera plane so the track fills the
+        // bottom of the screen (no black strip below the player).
         val slab = Path().apply {
-            val a = proj(-3.6f, 0f, 1f); val b = proj(3.6f, 0f, 1f)
+            val a = proj(-3.6f, 0f, -6f); val b = proj(3.6f, 0f, -6f)
             val c = proj(3.6f, 0f, 64f); val dPt = proj(-3.6f, 0f, 64f)
             if (a != null && b != null && c != null && dPt != null) {
                 moveTo(a.x, a.y); lineTo(b.x, b.y)
@@ -157,9 +159,9 @@ fun GameRenderer(
 
         // ---- scrolling cross ties every 4 world units ----
         val tieMod = engine.distance % 4f
-        for (m in 1..17) {
+        for (m in -1..17) {
             val zLine = m * 4f - tieMod
-            if (zLine < 0.6f) continue
+            if (zLine < -6f) continue
             val a = proj(-3.2f, 0f, zLine) ?: continue
             val b = proj(3.2f, 0f, zLine) ?: continue
             val sw = (scaleAt(zLine) * 0.16f).coerceAtLeast(1.5f)
@@ -171,7 +173,7 @@ fun GameRenderer(
 
         // ---- lane dividers converging to the vanishing point ----
         for (dx in floatArrayOf(-3.4f, -1.1f, 1.1f, 3.4f)) {
-            val a = proj(dx, 0f, 1f) ?: continue
+            val a = proj(dx, 0f, -6f) ?: continue
             val b = proj(dx, 0f, 64f) ?: continue
             val edge = abs(dx) > 2f
             drawLine(
