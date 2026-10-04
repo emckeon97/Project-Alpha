@@ -20,14 +20,17 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import com.emckeon97.projectdelta.characters.drawCharacter
+import com.emckeon97.projectdelta.characters.rememberSpriteBitmap
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.sin
 
 /**
@@ -58,6 +61,11 @@ fun GameRenderer(
     var gameOverFired by remember { mutableStateOf(false) }
     var speedU by remember { mutableFloatStateOf(8f) }
     var lastDist by remember { mutableFloatStateOf(0f) }
+    // Animation juice (mirrors iOS Player): lane lean, land squash.
+    var lean by remember { mutableFloatStateOf(0f) }
+    var landT by remember { mutableFloatStateOf(1f) } // 1 = inactive
+    var wasAirborne by remember { mutableStateOf(false) }
+    val spriteBitmap = rememberSpriteBitmap(characterID)
     val charBasePx = with(density) { 130.dp.toPx() }
 
     LaunchedEffect(Unit) {
@@ -75,6 +83,16 @@ fun GameRenderer(
                         speedU = ((d - lastDist) / (dtMs / 1000f)).coerceIn(0f, 30f)
                     }
                     lastDist = d
+                    // lane-change lean: ease toward clamp(lateral * 0.15, ±0.3)
+                    val dtSec = dtMs / 1000f
+                    val lateral = GameEngine.LANE_X[engine.playerLane] - engine.playerX
+                    val targetLean = (lateral * 0.15f).coerceIn(-0.3f, 0.3f)
+                    lean += (targetLean - lean) * minOf(1f, dtSec * 10f)
+                    // land-squash trigger on touchdown
+                    val airborne = engine.playerY > 0.02f
+                    if (wasAirborne && !airborne && !engine.isRolling) landT = 0f
+                    wasAirborne = airborne
+                    if (landT < 0.22f) landT += dtSec
                 } else if (!gameOverFired) {
                     gameOverFired = true
                     onGameOver()
@@ -184,16 +202,41 @@ fun GameRenderer(
                 is CoinItem -> drawCoin(item.c, tSec, ::proj, ::scaleAt)
                 is PowItem -> drawPowerUp(item.p, ::proj, ::scaleAt, textMeasurer, density)
                 is PlayerItem -> {
-                    val feet = proj(engine.playerX, engine.playerY, 0f)
+                    // subtle running bob (mirrors iOS runPhase)
+                    val bobY = if (!engine.isRolling && engine.playerY < 0.02f)
+                        sin(tSec * 14f) * 0.05f else 0f
+                    val feet = proj(engine.playerX, engine.playerY + bobY, 0f)
                     if (feet != null) {
                         val s = scaleAt(0f)
-                        drawCharacter(
-                            id = characterID,
-                            centerX = feet.x,
-                            feetY = feet.y,
-                            size = charBasePx * s / sPlayer,
-                            rolling = engine.isRolling
-                        )
+                        // jump stretch / land squash (never while rolling)
+                        var sx = 1f
+                        var sy = 1f
+                        if (!engine.isRolling) {
+                            if (engine.playerY > 0.02f) {
+                                val js = (engine.playerY / GameEngine.JUMP_HEIGHT).coerceIn(0f, 1f)
+                                sx = 1f - 0.07f * js
+                                sy = 1f + 0.10f * js
+                            } else if (landT < 0.22f) {
+                                val k = 1f - landT / 0.22f
+                                sx = 1f + 0.10f * k
+                                sy = 1f - 0.16f * k
+                            }
+                        }
+                        val pivot = Offset(feet.x, feet.y)
+                        withTransform({
+                            // iOS eulerAngles.z is CCW in y-up; Canvas y is down, so negate
+                            rotate(degrees = -lean * 57.2958f, pivot = pivot)
+                            scale(sx, sy, pivot = pivot)
+                        }) {
+                            drawCharacter(
+                                id = characterID,
+                                centerX = feet.x,
+                                feetY = feet.y,
+                                size = charBasePx * s / sPlayer,
+                                rolling = engine.isRolling,
+                                sprite = spriteBitmap
+                            )
+                        }
                         // shadow, fading as the jump rises
                         val g = proj(engine.playerX, 0f, 0f)
                         if (g != null) {
