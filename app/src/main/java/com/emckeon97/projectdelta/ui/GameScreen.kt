@@ -41,7 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.emckeon97.projectdelta.characters.CharacterManager
-import com.emckeon97.projectdelta.game.GameEngineimport com.emckeon97.projectdelta.game.GameRenderer
+import com.emckeon97.projectdelta.game.GameEngine
+import com.emckeon97.projectdelta.game.GameRenderer
 import kotlin.math.abs
 
 /** Sepia HUD pill: cream serif text on dark translucent, gold hairline. */
