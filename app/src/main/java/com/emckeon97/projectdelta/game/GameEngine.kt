@@ -161,7 +161,7 @@ class GameEngine {
         magnetActive = elapsedMs < magnetUntil
         doubleScore = elapsedMs < multiplierUntil
 
-        // speed ramp: 8 -> 22 u/s over ~40s
+        // speed ramp: 10 -> 26 u/s over ~32s
         scrollSpeed = minOf(MAX_SPEED, START_SPEED + (elapsedMs / 1000f) * SPEED_RAMP)
 
         val dz = scrollSpeed * dt
@@ -352,12 +352,12 @@ class GameEngine {
         /** Lane x positions in world units. */
         val LANE_X = floatArrayOf(-2.2f, 0f, 2.2f)
 
-        const val START_SPEED = 8f        // world units/s
-        const val MAX_SPEED = 22f
-        const val SPEED_RAMP = 0.35f      // u/s gained per second (~40s to max)
+        const val START_SPEED = 10f       // world units/s
+        const val MAX_SPEED = 26f
+        const val SPEED_RAMP = 0.5f       // u/s gained per second (~32s to max)
         const val LANE_LERP = 12f         // lateral u/s toward target lane
-        const val JUMP_TIME = 0.72f       // seconds
-        const val JUMP_HEIGHT = 3.2f      // world units
+        const val JUMP_TIME = 0.88f       // seconds (floatier arc, more room)
+        const val JUMP_HEIGHT = 3.5f      // world units
         const val ROLL_TIME = 0.75f       // seconds
         const val PLAYER_MID_H = 0.8f     // approx. torso height for pickups
 
