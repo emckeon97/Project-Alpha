@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
-import com.emckeon97.projectdelta.ads.AdManager
 import com.emckeon97.projectdelta.characters.CharacterManager
 import com.emckeon97.projectdelta.characters.drawCharacter
 import com.emckeon97.projectdelta.characters.spriteResFor
@@ -53,10 +52,7 @@ fun MainMenuScreen(navController: NavController, characterManager: CharacterMana
     val selected = characterManager.characters.first { it.id == selectedID }
     val muted by MusicManager.isMuted.collectAsState()
 
-    // Preload fullscreen ads so they're ready after a run.
     LaunchedEffect(Unit) {
-        AdManager.loadInterstitial(context)
-        AdManager.loadRewarded(context)
         MusicManager.play(context)
     }
 
@@ -204,10 +200,6 @@ fun MainMenuScreen(navController: NavController, characterManager: CharacterMana
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
-            AndroidView(
-                factory = { ctx -> AdManager.bannerView(ctx) },
-                modifier = Modifier.fillMaxWidth()
-            )
         }
         // Music mute toggle.
         Button(
