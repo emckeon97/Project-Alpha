@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.emckeon97.projectdelta.ads.AdManager
 import com.emckeon97.projectdelta.characters.CharacterManager
 import com.emckeon97.projectdelta.game.GameEngine
 
@@ -47,10 +48,14 @@ fun GameOverScreen(
     val highScore by characterManager.highScore.collectAsState()
     // Freeze the "new best" verdict before recordScore() runs below.
     val isNewBest = remember { score > 0 && score > characterManager.highScore.value }
+    val rewardedReady by AdManager.isRewardedReady.collectAsState()
 
     LaunchedEffect(Unit) {
         characterManager.addCoins(coins)
         characterManager.recordScore(score)
+        AdManager.loadInterstitial(context)
+        AdManager.loadRewarded(context)
+        AdManager.gameOverOccurred(activity)
     }
 
     Column(
@@ -96,19 +101,23 @@ fun GameOverScreen(
         Spacer(Modifier.height(32.dp))
         Button(
             onClick = {
-                navController.navigate(Routes.game(revive = true)) {
-                    popUpTo(Routes.MENU)
+                AdManager.showRewarded(activity) {
+                    navController.navigate(Routes.game(revive = true)) {
+                        popUpTo(Routes.MENU)
+                    }
                 }
             },
+            enabled = rewardedReady,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = DeltaTheme.gold,
                 contentColor = DeltaTheme.ink,
+                disabledContainerColor = DeltaTheme.gold.copy(alpha = 0.45f)
             )
         ) {
             Text(
-                text = "ENCORE",
+                text = "\uD83D\uDCFA ENCORE — WATCH AD",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Serif,
