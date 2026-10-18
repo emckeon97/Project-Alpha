@@ -55,4 +55,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.navigation:navigation-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.5")
+    implementation("com.google.android.gms:play-services-ads:23.4.0")
 }
