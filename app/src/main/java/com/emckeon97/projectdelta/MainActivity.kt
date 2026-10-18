@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.emckeon97.projectdelta.ads.AdManager
 import com.emckeon97.projectdelta.characters.CharacterManager
 import com.emckeon97.projectdelta.game.MusicManager
 import com.emckeon97.projectdelta.ui.AppNav
@@ -24,6 +25,7 @@ class MainActivity : ComponentActivity() {
                 else -> {}
             }
         })
+        AdManager.initialize(this)
         val characterManager = CharacterManager(applicationContext)
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
