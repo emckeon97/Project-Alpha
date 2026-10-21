@@ -9,4 +9,4 @@ Separate native Android port of the Pier Pressure endless runner (Kotlin + Jetpa
 - Ads: banner on menu, interstitial every 3rd game over, rewarded revive — **Google test ad IDs** for now; flip `AdManager.useTestIDs` to `false` and fill `REAL_*` in `ads/AdManager.kt` for production
 
 ## Build
-Open `project-delta-android/` in Android Studio and run. Requires the Android SDK + Gradle (wrapper not included).
+Open the repository root (the folder containing `settings.gradle.kts`) in Android Studio and run. Requires the Android SDK + Gradle (wrapper not included).
